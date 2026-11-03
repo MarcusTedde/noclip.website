@@ -43,7 +43,7 @@ export class GameBrowser {
     constructor() {
         try { this.recent = JSON.parse(localStorage.getItem('noclip.archive.recent') || '[]').filter((r: any) => typeof r.group === 'string' && typeof r.map === 'string').slice(0, 6); } catch {}
         this.search.type = 'search';
-        this.search.placeholder = 'Search games and worlds';
+        this.search.placeholder = 'Search games & maps';
         this.search.setAttribute('aria-label', 'Search games and maps');
         this.search.autocomplete = 'off';
         this.search.oninput = () => { this.query = this.search.value; this.render(); };
