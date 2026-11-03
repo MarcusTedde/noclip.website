@@ -135,3 +135,14 @@ test('virtual controls trigger camera shortcuts once per press', () => {
     input.setVirtualKey(3, 'KeyW');
     assert.equal(input.isKeyDownEventTriggered('KeyW'), true);
 });
+
+
+test('fast swipes on a small screen are not discarded as mouse noise', () => {
+    const { canvas, input } = setup();
+    canvas.clientWidth = 320;
+    canvas.clientHeight = 568;
+    touch(canvas, 'touchstart', [[10, 100]]);
+    touch(canvas, 'touchmove', [[110, 180]]);
+    assert.equal(input.getMouseDeltaX(), 312.5);
+    assert.equal(input.getMouseDeltaY(), 250);
+});

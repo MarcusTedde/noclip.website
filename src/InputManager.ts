@@ -277,7 +277,8 @@ export default class InputManager {
         if (e.targetTouches.length === 1) {
             const scaledTouches = this._getScaledTouches(e.targetTouches);
             this.touchGesture = TouchGesture.Scroll;
-            this.onMotion(scaledTouches[0].x - this.prevTouchX, scaledTouches[0].y - this.prevTouchY);
+            this.dx += scaledTouches[0].x - this.prevTouchX;
+            this.dy += scaledTouches[0].y - this.prevTouchY;
             this.prevTouchX = scaledTouches[0].x;
             this.prevTouchY = scaledTouches[0].y;
         } else if (e.targetTouches.length === 2) {
