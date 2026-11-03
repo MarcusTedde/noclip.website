@@ -2442,7 +2442,7 @@ class BottomBar {
         this.elem = document.createElement('div');
         this.elem.id = 'BottomBar';
         this.elem.style.position = 'absolute';
-        this.elem.style.bottom = '32px';
+        this.elem.style.bottom = 'max(var(--bar-inset, 32px), env(safe-area-inset-bottom))';
         this.elem.style.left = '32px';
         this.elem.style.right = '32px';
         this.elem.style.display = 'grid';

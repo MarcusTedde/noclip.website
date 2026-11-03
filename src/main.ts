@@ -425,6 +425,7 @@ class Main {
         this.isEmbedMode = window.location.pathname === '/embed.html';
 
         this.toplevel = document.createElement('div');
+        this.toplevel.style.position = 'relative';
         document.body.appendChild(this.toplevel);
 
         this.toplevel.ondragover = (e) => {
@@ -523,6 +524,7 @@ class Main {
 
             this.canvas = canvas;
             this.canvas.style.imageRendering = 'pixelated';
+            this.canvas.style.display = 'block';
             this.canvas.style.outline = 'none';
             this.canvas.style.touchAction = 'none';
 
@@ -759,6 +761,7 @@ class Main {
         const viewport = window.visualViewport;
         const width = viewport?.width ?? window.innerWidth;
         const height = viewport?.height ?? window.innerHeight;
+        this.toplevel.style.height = `${height}px`;
         resizeCanvas(this.canvas, width, height, window.devicePixelRatio / this.pixelSize);
         document.documentElement.style.setProperty('--viewport-height', `${height}px`);
     }
