@@ -446,7 +446,8 @@ class Main {
             return;
         }
 
-        window.onresize = this._onResize.bind(this);
+        window.addEventListener('resize', this._onResize.bind(this));
+        window.visualViewport?.addEventListener('resize', this._onResize.bind(this));
 
         this.animationLoop.onupdate = this.animationLoopOnUpdate.bind(this);
 
@@ -755,7 +756,11 @@ class Main {
     }
 
     private _onResize() {
-        resizeCanvas(this.canvas, window.innerWidth, window.innerHeight, window.devicePixelRatio / this.pixelSize);
+        const viewport = window.visualViewport;
+        const width = viewport?.width ?? window.innerWidth;
+        const height = viewport?.height ?? window.innerHeight;
+        resizeCanvas(this.canvas, width, height, window.devicePixelRatio / this.pixelSize);
+        document.documentElement.style.setProperty('--viewport-height', `${height}px`);
     }
 
     private _getSceneSaveState(): SaveState {

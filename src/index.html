@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>noclip</title>
     <meta name="description" content="A digital museum of video game levels">
     <link rel="icon" sizes="16x16" href="<%= require('./assets/icon.png') %>">
@@ -14,7 +14,26 @@
             font-style: normal;
             src: url('<%= require("./assets/fontello.woff2") %>') format('woff2');
         }
-        html, body { margin: 0; overflow: hidden; font-size: 100%; }
+        html, body { margin: 0; overflow: hidden; font-size: 100%; width: 100%; height: 100%; overscroll-behavior: none; }
+        #BottomBar { bottom: max(32px, env(safe-area-inset-bottom)) !important; }
+        #Panel { max-height: var(--viewport-height, 100dvh); padding-top: max(32px, env(safe-area-inset-top)) !important; }
+        @media (max-width: 1050px) {
+            #Panel { padding: max(8px, env(safe-area-inset-top)) 8px 80px max(8px, env(safe-area-inset-left)) !important; max-width: calc(100vw - 16px); max-height: var(--viewport-height, 100dvh); box-sizing: border-box; overflow: auto !important; }
+            .viewer-panel { grid-auto-flow: row !important; gap: 0 !important; transition: none !important; }
+            .viewer-panel-main { max-width: calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
+            .viewer-panel-contents, .viewer-panel-header { width: min(440px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right))) !important; }
+            .viewer-panel-extra > * { width: min(440px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right))) !important; max-height: 35dvh; overflow: auto; }
+            .scroll-select { max-height: 35dvh; }
+            .viewer-panel-contents > * { max-width: 100%; box-sizing: border-box; }
+            #BottomBar { left: max(8px, env(safe-area-inset-left)) !important; right: max(8px, env(safe-area-inset-right)) !important; bottom: max(8px, env(safe-area-inset-bottom)) !important; }
+            .bottom-bar-panel { max-width: calc(100vw - 32px); max-height: calc(var(--viewport-height, 100dvh) - 96px); overflow: auto; }
+            input, textarea, select { font-size: 16px !important; }
+        }
+        @media (any-pointer: coarse) {
+            .viewer-panel-header { min-height: 44px; }
+            .scroll-select .selector { min-height: 44px; display: flex !important; align-items: center; }
+            #BottomBar > div > div { min-width: 44px; min-height: 44px; }
+        }
     </style>
 </head>
 <body>

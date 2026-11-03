@@ -70,6 +70,9 @@ export default class InputManager {
         document.addEventListener('keydown', this._onKeyDown, { capture: true });
         document.addEventListener('keyup', this._onKeyUp, { capture: true });
         window.addEventListener('blur', this._onBlur);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) this._onBlur();
+        });
         window.addEventListener('contextmenu', (e) => {
             e.preventDefault();
         });
@@ -93,7 +96,7 @@ export default class InputManager {
         this.toplevel.addEventListener('touchstart', this._onTouchChange, { passive: true });
         this.toplevel.addEventListener('touchend', this._onTouchChange, { passive: true });
         this.toplevel.addEventListener('touchcancel', this._onTouchChange, { passive: true });
-        this.toplevel.addEventListener('touchmove', this._onTouchMove, { passive: true });
+        this.toplevel.addEventListener('touchmove', this._onTouchMove, { passive: false });
 
         this.afterFrame();
 
@@ -194,6 +197,10 @@ export default class InputManager {
 
     private _onBlur = () => {
         this.keysDown.clear();
+        this.touchGesture = TouchGesture.None;
+        this.buttons = 0;
+        this.afterFrame();
+        this.ondraggingmodechanged?.();
     };
 
     private _onWheel = (e: WheelEvent) => {
@@ -225,15 +232,16 @@ export default class InputManager {
     private _onTouchChange = (e: TouchEvent) => { // start, end or cancel a touch
         if (!this.isMouseEnabled)
             return;
-        if (e.touches.length === 1) {
-            const scaledTouches = this._getScaledTouches(e.touches);
+        this.dx = this.dy = this.dTouchX = this.dTouchY = this.dPinchDist = 0;
+        if (e.targetTouches.length === 1) {
+            const scaledTouches = this._getScaledTouches(e.targetTouches);
             this.touchGesture = TouchGesture.Scroll;
             this.prevTouchX = scaledTouches[0].x;
             this.prevTouchY = scaledTouches[0].y;
             this.dTouchX = 0;
             this.dTouchY = 0;
-        } else if (e.touches.length === 2) {
-            const pinchValues = this._getPinchValues(e.touches);
+        } else if (e.targetTouches.length === 2) {
+            const pinchValues = this._getPinchValues(e.targetTouches);
             this.touchGesture = TouchGesture.Pinch;
             this.prevTouchX = pinchValues.x;
             this.prevTouchY = pinchValues.y;
@@ -244,25 +252,25 @@ export default class InputManager {
         } else {
             this.touchGesture = TouchGesture.None;
         }
+        this.ondraggingmodechanged?.();
     };
 
     private _onTouchMove = (e: TouchEvent) => {
         if (!this.isMouseEnabled)
             return;
-        if (e.touches.length === 1) {
-            const scaledTouches = this._getScaledTouches(e.touches);
+        if (e.cancelable) e.preventDefault();
+        if (e.targetTouches.length === 1) {
+            const scaledTouches = this._getScaledTouches(e.targetTouches);
             this.touchGesture = TouchGesture.Scroll;
-            this.dTouchX = scaledTouches[0].x - this.prevTouchX;
-            this.dTouchY = scaledTouches[0].y - this.prevTouchY;
-            this.onMotion(this.dTouchX, this.dTouchY);
+            this.onMotion(scaledTouches[0].x - this.prevTouchX, scaledTouches[0].y - this.prevTouchY);
             this.prevTouchX = scaledTouches[0].x;
             this.prevTouchY = scaledTouches[0].y;
-        } else if (e.touches.length === 2) {
-            const pinchValues = this._getPinchValues(e.touches);
+        } else if (e.targetTouches.length === 2) {
+            const pinchValues = this._getPinchValues(e.targetTouches);
             this.touchGesture = TouchGesture.Pinch;
-            this.dTouchX = pinchValues.x - this.prevTouchX;
-            this.dTouchY = pinchValues.y - this.prevTouchY;
-            this.dPinchDist = pinchValues.dist - this.prevPinchDist;
+            this.dTouchX += pinchValues.x - this.prevTouchX;
+            this.dTouchY += pinchValues.y - this.prevTouchY;
+            this.dPinchDist += pinchValues.dist - this.prevPinchDist;
             this.prevTouchX = pinchValues.x;
             this.prevTouchY = pinchValues.y;
             this.prevPinchDist = pinchValues.dist;

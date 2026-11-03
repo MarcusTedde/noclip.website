@@ -69,8 +69,8 @@ function resetGfxStatisticsGroup(group: GfxStatisticsGroup): void {
 }
 
 export function resizeCanvas(canvas: HTMLCanvasElement, width: number, height: number, devicePixelRatio: number): void {
-    const nw = width * devicePixelRatio;
-    const nh = height * devicePixelRatio;
+    const nw = Math.max(1, Math.floor(width * devicePixelRatio));
+    const nh = Math.max(1, Math.floor(height * devicePixelRatio));
     if (canvas.width === nw && canvas.height === nh)
         return;
 

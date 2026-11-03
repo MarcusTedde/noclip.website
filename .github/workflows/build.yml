@@ -38,11 +38,14 @@ jobs:
     - name: Debug
       run: echo "RUST_LOG=info" >> $GITHUB_ENV
 
+    - name: Test mobile input
+      run: node --import tsx --test tests/mobile-input.test.ts
+
     - name: Run build
       run: pnpm run build
 
     - name: Deploy
-      if: github.ref == 'refs/heads/main'
+      if: github.repository == 'magcius/noclip.website' && github.ref == 'refs/heads/main'
       uses: burnett01/rsync-deployments@9.0.2
       with:
         switches: -va --delete-after --exclude=data/ --exclude=priv/ --exclude=.well-known/

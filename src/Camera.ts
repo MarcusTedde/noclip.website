@@ -667,7 +667,10 @@ export class OrbitCameraController implements CameraController {
         this.xVel = clampRange(this.xVel, 2);
         this.yVel = clampRange(this.yVel, 2);
 
-        let zTargetAdjAmt = inputManager.dz * 80.0;
+        this.txVel += inputManager.getTouchDeltaX() * (-10 - Math.min(this.z, 0.01)) / -5000;
+        this.tyVel += inputManager.getTouchDeltaY() * (-10 - Math.min(this.z, 0.01)) / 5000;
+
+        let zTargetAdjAmt = inputManager.dz * 80.0 + inputManager.getPinchDeltaDist() * Math.max(10, Math.abs(this.zTarget)) * 0.005;
         if (inputManager.isKeyDown('KeyQ'))
             zTargetAdjAmt -= 80.0;
         if (inputManager.isKeyDown('KeyE'))
@@ -816,7 +819,10 @@ export class OrthoCameraController implements CameraController {
             this.xTarget += this.orbitSpeed * 1/25;
         }
 
-        let zTargetAdjAmt = inputManager.dz * 80.0;
+        this.txVel += inputManager.getTouchDeltaX() * (-10 - Math.min(this.z, 0.01)) / -5000;
+        this.tyVel += inputManager.getTouchDeltaY() * (-10 - Math.min(this.z, 0.01)) / 5000;
+
+        let zTargetAdjAmt = inputManager.dz * 80.0 + inputManager.getPinchDeltaDist() * Math.max(10, Math.abs(this.zTarget)) * 0.005;
         if (inputManager.isKeyDown('KeyQ'))
             zTargetAdjAmt -= 80.0;
         if (inputManager.isKeyDown('KeyE'))

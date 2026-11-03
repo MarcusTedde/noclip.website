@@ -267,6 +267,7 @@ export abstract class ScrollSelect implements Widget {
         this.toplevel = document.createElement('div');
 
         this.scrollContainer = document.createElement('div');
+        this.scrollContainer.classList.add('scroll-select');
         this.setHeight(`200px`);
         this.setTextSelectable(false);
         this.scrollContainer.style.overflow = 'auto';
@@ -772,6 +773,7 @@ export class Panel implements Widget {
 
     constructor() {
         this.toplevel = document.createElement('div');
+        this.toplevel.classList.add('viewer-panel');
         this.toplevel.style.color = 'white';
         this.toplevel.style.font = '16px monospace';
         this.toplevel.style.overflow = 'hidden';
@@ -785,14 +787,17 @@ export class Panel implements Widget {
         this.toplevel.onmouseenter = this.syncSize.bind(this);
         this.toplevel.onmouseleave = this.syncSize.bind(this);
         this.toplevel.tabIndex = -1;
+        window.addEventListener('resize', () => this.syncSize());
 
         this.mainPanel = document.createElement('div');
+        this.mainPanel.classList.add('viewer-panel-main');
         this.mainPanel.style.overflow = 'hidden';
         this.mainPanel.style.transition = '.25s ease-out';
         this.mainPanel.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
         this.toplevel.appendChild(this.mainPanel);
 
         this.extraRack = document.createElement('div');
+        this.extraRack.classList.add('viewer-panel-extra');
         this.extraRack.style.gridAutoFlow = 'column';
         this.extraRack.style.gap = '20px';
         this.extraRack.style.transition = '.15s ease-out .10s';
@@ -803,6 +808,7 @@ export class Panel implements Widget {
 
         this.header = document.createElement('h1');
         this.header.style.lineHeight = '28px';
+        this.header.classList.add('viewer-panel-header');
         this.header.style.width = '440px';
         this.header.style.margin = '0';
         this.header.style.fontSize = '100%';
@@ -824,6 +830,7 @@ export class Panel implements Widget {
         this.headerContainer.appendChild(this.header);
 
         this.contents = document.createElement('div');
+        this.contents.classList.add('viewer-panel-contents');
         this.contents.style.width = '440px';
         this.mainPanel.appendChild(this.contents);
 
@@ -840,17 +847,20 @@ export class Panel implements Widget {
 
     private syncSize() {
         const widthExpanded = this.expanded || this.mainPanel.matches(':hover');
-        this.mainPanel.style.width = widthExpanded ? '440px' : '28px';
+        const collapsedSize = window.matchMedia('(any-pointer: coarse)').matches ? '44px' : '28px';
+        this.mainPanel.style.width = widthExpanded ? '440px' : collapsedSize;
 
         const heightExpanded = this.expanded;
         if (heightExpanded) {
-            const height = Math.max(this.header.offsetHeight + this.contents.offsetHeight, this.extraRack.offsetHeight);
-            this.toplevel.style.height = `${height}px`;
+            const stacked = window.matchMedia('(max-width: 1050px)').matches;
+            const mainHeight = this.header.offsetHeight + this.contents.offsetHeight;
+            const height = Math.max(mainHeight, this.extraRack.offsetHeight);
+            this.toplevel.style.height = stacked ? 'auto' : `${height}px`;
             this.extraRack.style.opacity = '1';
             this.extraRack.style.width = 'auto';
         } else {
             this.toplevel.style.transition = '.25s ease-out';
-            this.toplevel.style.height = '28px';
+            this.toplevel.style.height = collapsedSize;
             this.extraRack.style.opacity = '0';
             this.extraRack.style.width = '0';
         }
@@ -2585,6 +2595,7 @@ class PanelButton extends SingleIconButton {
         super();
 
         this.panel = document.createElement('div');
+        this.panel.classList.add('bottom-bar-panel');
         this.panel.style.position = 'absolute';
         this.panel.style.top = '0';
         this.panel.style.marginTop = '-32px';
@@ -2863,6 +2874,7 @@ export class UI {
         this.viewerSettings.setViewer(viewer);
         this.studioPanel.setViewer(viewer);
 
+        this.toplevel.addEventListener('touchstart', () => this.setMouseActive(), { passive: true });
         window.onmousemove = () => {
             this.setMouseActive();
         };
@@ -2963,6 +2975,8 @@ export class UI {
     }
 
     private shouldBottomBarBeFadeIn(): boolean {
+        if (window.matchMedia('(any-pointer: coarse)').matches)
+            return true;
         if (this.bottomBar.isAnyPanelExpanded())
             return true;
 
