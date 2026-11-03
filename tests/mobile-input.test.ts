@@ -82,3 +82,56 @@ test('backgrounding clears pressed keys and camera gestures', () => {
     assert.equal(input.getDraggingMode(), DraggingMode.None);
     assert.equal(input.getPinchDeltaDist(), 0);
 });
+
+
+test('virtual controls combine with physical keys and release independently', () => {
+    const { input } = setup();
+    input.keysDown.set('KeyW', false);
+    input.setVirtualKey(1, 'KeyW');
+    input.setVirtualKey(2, 'KeyD');
+    assert.equal(input.isKeyDown('KeyW'), true);
+    assert.equal(input.isKeyDown('KeyD'), true);
+    input.setVirtualKey(1, null);
+    assert.equal(input.isKeyDown('KeyW'), true);
+    input.keysDown.delete('KeyW');
+    assert.equal(input.isKeyDown('KeyW'), false);
+    assert.equal(input.isKeyDown('KeyD'), true);
+    input.setVirtualKey(2, null);
+    assert.equal(input.isKeyDown('KeyD'), false);
+});
+
+test('two fingers holding one movement button require two releases', () => {
+    const { input } = setup();
+    input.setVirtualKey(1, 'KeyW');
+    input.setVirtualKey(2, 'KeyW');
+    input.setVirtualKey(1, null);
+    assert.equal(input.isKeyDown('KeyW'), true);
+    input.setVirtualKey(2, null);
+    assert.equal(input.isKeyDown('KeyW'), false);
+});
+
+test('scene resets and backgrounding clear virtual movement', () => {
+    const { input } = setup();
+    input.setVirtualKey(1, 'KeyW');
+    input.reset();
+    assert.equal(input.isKeyDown('KeyW'), false);
+    input.setVirtualKey(2, 'KeyD');
+    windowTarget.dispatchEvent(new Event('blur'));
+    assert.equal(input.isKeyDown('KeyD'), false);
+});
+
+
+test('virtual controls trigger camera shortcuts once per press', () => {
+    const { input } = setup();
+    input.setVirtualKey(1, 'KeyW');
+    assert.equal(input.isKeyDownEventTriggered('KeyW'), true);
+    input.afterFrame();
+    assert.equal(input.isKeyDown('KeyW'), true);
+    assert.equal(input.isKeyDownEventTriggered('KeyW'), false);
+    input.setVirtualKey(2, 'KeyW');
+    assert.equal(input.isKeyDownEventTriggered('KeyW'), false);
+    input.setVirtualKey(1, null);
+    input.setVirtualKey(2, null);
+    input.setVirtualKey(3, 'KeyW');
+    assert.equal(input.isKeyDownEventTriggered('KeyW'), true);
+});

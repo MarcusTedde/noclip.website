@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+    if: github.repository == 'magcius/noclip.website'
     name: Build and deploy
     runs-on: ubuntu-latest
 

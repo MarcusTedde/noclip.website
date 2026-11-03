@@ -33,6 +33,8 @@ export enum DraggingMode {
 }
 
 export default class InputManager {
+    private virtualKeys = new Map<number, string>();
+    private virtualKeyEvents = new Set<string>();
     public invertY = false;
     public invertX = false;
 
@@ -136,11 +138,22 @@ export default class InputManager {
     }
 
     public isKeyDownEventTriggered(key: string): boolean {
-        return !!this.keysDown.get(key);
+        return !!this.keysDown.get(key) || this.virtualKeyEvents.has(key);
     }
 
     public isKeyDown(key: string): boolean {
-        return this.keysDown.has(key);
+        return this.keysDown.has(key) || [...this.virtualKeys.values()].includes(key);
+    }
+
+    public setVirtualKey(pointer: number, key: string | null): void {
+        if (key === null) {
+            const released = this.virtualKeys.get(pointer);
+            this.virtualKeys.delete(pointer);
+            if (released !== undefined && !this.isKeyDown(released)) this.virtualKeyEvents.delete(released);
+        } else if (this.isMouseEnabled) {
+            if (!this.isKeyDown(key)) this.virtualKeyEvents.add(key);
+            this.virtualKeys.set(pointer, key);
+        }
     }
 
     public getDraggingMode(): DraggingMode {
@@ -159,6 +172,7 @@ export default class InputManager {
     }
 
     public afterFrame() {
+        this.virtualKeyEvents.clear();
         this.dx = 0;
         this.dy = 0;
         this.dz = 0;
@@ -197,6 +211,7 @@ export default class InputManager {
 
     private _onBlur = () => {
         this.keysDown.clear();
+        this.virtualKeys.clear();
         this.touchGesture = TouchGesture.None;
         this.buttons = 0;
         this.afterFrame();
@@ -296,6 +311,7 @@ export default class InputManager {
     }
 
     public reset(): void {
+        this._onBlur();
         this.isMouseEnabled = true;
     }
 }

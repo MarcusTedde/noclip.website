@@ -1,0 +1,56 @@
+name: Publish GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          cache-directories: ~/.cargo/bin
+      - run: pnpm install --frozen-lockfile
+      - run: node --import tsx --test tests/*.test.ts
+      - run: cargo build --release --target wasm32-unknown-unknown --manifest-path rust/Cargo.toml --locked
+      - run: command -v wasm-bindgen || cargo install wasm-bindgen-cli --version 0.2.100 --locked
+      - run: wasm-bindgen rust/target/wasm32-unknown-unknown/release/noclip_rust_support.wasm --out-dir rust/pkg --out-name index --target web
+      - run: pnpm exec tsc --noEmit --skipLibCheck
+      - run: pnpm exec rsbuild build
+        env:
+          PUBLIC_BASE_PATH: /noclip.website/
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+  deploy:
+    if: github.repository == 'MarcusTedde/noclip.website'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

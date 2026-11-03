@@ -671,9 +671,9 @@ export class OrbitCameraController implements CameraController {
         this.tyVel += inputManager.getTouchDeltaY() * (-10 - Math.min(this.z, 0.01)) / 5000;
 
         let zTargetAdjAmt = inputManager.dz * 80.0 + inputManager.getPinchDeltaDist() * Math.max(10, Math.abs(this.zTarget)) * 0.005;
-        if (inputManager.isKeyDown('KeyQ'))
+        if (inputManager.isKeyDown('KeyQ') || inputManager.isKeyDown('PageDown'))
             zTargetAdjAmt -= 80.0;
-        if (inputManager.isKeyDown('KeyE'))
+        if (inputManager.isKeyDown('KeyE') || inputManager.isKeyDown('PageUp'))
             zTargetAdjAmt += 80.0;
         this.zTarget += zTargetAdjAmt * this.sceneMoveSpeedMult;
         if (this.zTarget > -10)
@@ -823,9 +823,9 @@ export class OrthoCameraController implements CameraController {
         this.tyVel += inputManager.getTouchDeltaY() * (-10 - Math.min(this.z, 0.01)) / 5000;
 
         let zTargetAdjAmt = inputManager.dz * 80.0 + inputManager.getPinchDeltaDist() * Math.max(10, Math.abs(this.zTarget)) * 0.005;
-        if (inputManager.isKeyDown('KeyQ'))
+        if (inputManager.isKeyDown('KeyQ') || inputManager.isKeyDown('PageDown'))
             zTargetAdjAmt -= 80.0;
-        if (inputManager.isKeyDown('KeyE'))
+        if (inputManager.isKeyDown('KeyE') || inputManager.isKeyDown('PageUp'))
             zTargetAdjAmt += 80.0;
         this.zTarget += zTargetAdjAmt;
         if (this.zTarget > -10)

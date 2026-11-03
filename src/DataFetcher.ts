@@ -186,8 +186,13 @@ class DataFetcherRequest {
 
         this.resolveArrayBuffer(arrayBuffer);
 
-        if (this.cache !== null)
-            await this.cache.put(this.request, responseClone);
+        if (this.cache !== null) {
+            try {
+                await this.cache.put(this.request, responseClone);
+            } catch {
+                this.cache = null;
+            }
+        }
 
         this.response = null;
     }

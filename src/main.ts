@@ -422,7 +422,7 @@ class Main {
     }
 
     public async init() {
-        this.isEmbedMode = window.location.pathname === '/embed.html';
+        this.isEmbedMode = window.location.pathname.endsWith('/embed.html');
 
         this.toplevel = document.createElement('div');
         this.toplevel.style.position = 'relative';
@@ -1074,7 +1074,11 @@ class Main {
         this.ui = new UI(this.viewer);
         this.ui.setEmbedMode(this.isEmbedMode);
         this.toplevel.appendChild(this.ui.elem);
-        this.ui.sceneSelect.onscenedescselected = this._onSceneDescSelected.bind(this);
+        this.ui.sceneSelect.onscenedescselected = (sceneDesc) => {
+            if (window.matchMedia('(max-width: 1050px), (any-pointer: coarse)').matches)
+                this.ui.setMenusHidden(true);
+            this._onSceneDescSelected(sceneDesc);
+        };
         this.ui.xrSettings.onWebXRStateRequested = this._onWebXRStateRequested.bind(this);
         this.ui.playPauseButton.onplaypause = this.setIsPlaying.bind(this);
         this._syncWebXRSettingsVisible();

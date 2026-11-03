@@ -7,6 +7,7 @@ import { Color, colorToCSS } from './Color.js';
 import { DebugFloaterHolder } from './DebugFloaters.js';
 import { GlobalGrabManager } from './GrabManager.js';
 import { DraggingMode } from './InputManager.js';
+import { MobileControls } from './MobileControls.js';
 import { clamp, invlerp, lerp, MathConstants } from './MathHelpers.js';
 import { RenderStatistics } from './RenderStatistics.js';
 import { GlobalSaveManager, SaveManager } from "./SaveManager.js";
@@ -2805,10 +2806,24 @@ export class UI {
     public isVisible: boolean = true;
     public hasScene: boolean = false;
 
+    private menusHidden = false;
+    private menuToggle = document.createElement('button');
+    private mobileControls: MobileControls;
     public studioModeEnabled: boolean = false;
 
     constructor(public viewer: Viewer.Viewer) {
         this.toplevel = document.createElement('div');
+        this.menuToggle.type = 'button';
+        this.menuToggle.className = 'menu-toggle';
+        this.menuToggle.setAttribute('aria-controls', 'Panel');
+        this.menuToggle.onclick = () => {
+            const showMenus = this.menusHidden || !this.isVisible;
+            this.toggleUI(true);
+            this.setMenusHidden(!showMenus);
+        };
+        this.toplevel.append(this.menuToggle);
+        this.mobileControls = new MobileControls(viewer.inputManager);
+        this.toplevel.append(this.mobileControls.elem);
 
         this.sceneUIContainer = document.createElement('div');
         this.sceneUIContainer.style.pointerEvents = 'none';
@@ -2890,6 +2905,7 @@ export class UI {
             return;
 
         this.viewer = viewer;
+        this.mobileControls.setInput(viewer.inputManager);
         this.viewerSettings.setViewer(this.viewer);
         this.studioPanel.setViewer(this.viewer);
 
@@ -3002,9 +3018,25 @@ export class UI {
         this.syncVisibilityState();
     }
 
+    public setMenusHidden(hidden: boolean): void {
+        this.menusHidden = hidden;
+        if (hidden) document.body.focus();
+        if (!hidden) {
+            this.setPanelsAutoClosed(false);
+            this.sceneSelect.setExpanded(true, false);
+        }
+        this.syncVisibilityState();
+    }
+
     private syncVisibilityState(): void {
-        const panelsVisible = !this.isEmbedMode && this.isVisible;
+        const panelsVisible = !this.isEmbedMode && this.isVisible && !this.menusHidden;
         this.panelToplevel.style.display = panelsVisible ? '' : 'none';
+        this.menuToggle.textContent = panelsVisible ? 'Hide menus' : 'Games';
+        this.menuToggle.setAttribute('aria-expanded', String(panelsVisible));
+        this.menuToggle.hidden = this.isEmbedMode;
+        this.mobileControls.setOrbitMode(this.viewer.cameraController instanceof OrbitCameraController || this.viewer.cameraController instanceof OrthoCameraController);
+        const compact = window.matchMedia('(max-width: 1050px), (any-pointer: coarse)').matches;
+        this.mobileControls.setVisible(this.hasScene && this.isVisible && (!compact || !panelsVisible));
 
         const bottomBarVisible = this.isVisible;
         this.bottomBar.setVisible(bottomBarVisible);
