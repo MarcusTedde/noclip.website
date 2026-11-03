@@ -1,3 +1,4 @@
+import './assets/explorer.css';
 
 // New UI system
 
@@ -8,6 +9,8 @@ import { DebugFloaterHolder } from './DebugFloaters.js';
 import { GlobalGrabManager } from './GrabManager.js';
 import { DraggingMode } from './InputManager.js';
 import { MobileControls } from './MobileControls.js';
+import { GameBrowser } from './GameBrowser.js';
+import { ScreenshotPanel } from './ScreenshotPanel.js';
 import { clamp, invlerp, lerp, MathConstants } from './MathHelpers.js';
 import { RenderStatistics } from './RenderStatistics.js';
 import { GlobalSaveManager, SaveManager } from "./SaveManager.js";
@@ -868,6 +871,7 @@ export class Panel implements Widget {
     }
 
     public setVisible(v: boolean) {
+        this.elem.hidden = !v;
         this.toplevel.style.display = v ? 'grid' : 'none';
     }
 
@@ -897,6 +901,7 @@ export class Panel implements Widget {
         if (this.expanded === newExpanded)
             return false;
         this.expanded = newExpanded;
+        this.elem.dataset.expanded = String(newExpanded);
         this.syncHeaderStyle();
         this.syncSize();
         if (!this.expanded)
@@ -958,310 +963,24 @@ interface SceneDatabase {
 }
 
 class SceneSelect extends Panel {
-    private sceneGroups: (string | SceneGroup)[] = [];
-    private sceneDescs: (string | SceneDesc)[] = [];
-
-    private searchEntry: TextEntry;
-    private randomButton: HTMLElement;
-    private sceneGroupList: SingleSelect;
-    private sceneDescList: SingleSelect;
-
-    private selectedSceneGroup: SceneGroup;
-    private currentSceneGroup: SceneGroup;
-    private currentSceneDesc: SceneDesc;
-    private forceVisible: boolean = IS_DEVELOPMENT;
-
-    private currentSearchTokens: RegExp[] = [];
-
-    public loadProgress: number;
-    public onscenedescselected: (sceneDesc: SceneDesc) => void;
-
+    public loadProgress = 1;
+    public onscenedescselected: (sceneDesc: SceneDesc) => void = () => {};
+    private browser = new GameBrowser();
+    private groups: (string | SceneGroup)[] = [];
+    private forceVisible = IS_DEVELOPMENT;
     constructor() {
-        super();
-        this.setTitle(OPEN_ICON, 'Games');
-
-        const topBox = document.createElement('div');
-        topBox.style.display = 'grid';
-        topBox.style.gridTemplateColumns = '1fr 40px';
-        topBox.style.background = 'rgba(0, 0, 0, 1.0)';
-        this.contents.append(topBox);
-
-        this.searchEntry = new TextEntry();
-        this.searchEntry.setIcon(SEARCH_ICON);
-        this.searchEntry.setPlaceholder('Search...');
-        this.searchEntry.ontext = (searchString: string) => {
-            this._setSearchString(searchString);
-        };
-        this.searchEntry.onfocus = () => {
-            // If the search entry manages to get itself focused (which can happen if the user hits Tab),
-            // then expand the panel.
-            this.setExpanded(true, false);
-            this.setAutoClosed(false);
-        };
-        topBox.appendChild(this.searchEntry.elem);
-
-        this.randomButton = document.createElement('div');
-        this.randomButton.title = 'Random';
-        this.randomButton.style.placeSelf = 'stretch';
-        this.randomButton.style.color = 'white';
-        this.randomButton.style.lineHeight = '20px';
-        this.randomButton.style.cursor = 'pointer';
-        this.randomButton.style.backgroundRepeat = 'no-repeat';
-        this.randomButton.style.backgroundPosition = 'center center';
-        this.randomButton.style.backgroundImage = svgStringToCSSBackgroundImage(DICE_ICON);
-        this.randomButton.onclick = () => {
-            this.selectRandom();
-        };
-        this.syncRandomButtonVisible();
-        topBox.appendChild(this.randomButton);
-
-        this.sceneGroupList = new SingleSelect();
-        this.sceneGroupList.setHeight('400px');
-        this.contents.appendChild(this.sceneGroupList.elem);
-
-        this.sceneDescList = new SingleSelect();
-        this.sceneDescList.setHighlightFlair = false;
-        this.sceneDescList.elem.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-        this.sceneDescList.elem.style.width = '500px';
-        this.sceneDescList.setHeight('472px');
-        this.extraRack.appendChild(this.sceneDescList.elem);
-
-        this.sceneGroupList.onselectionchange = (i: number) => {
-            this.selectSceneGroupIndex(i);
-        };
-
-        this.sceneDescList.onselectionchange = (i: number) => {
-            this.selectSceneDescIndex(i);
-        };
+        super(); this.setTitle(OPEN_ICON, 'Library');
+        this.contents.append(this.browser.elem);
+        this.browser.onselect = (_group, desc) => this.onscenedescselected(desc);
     }
-
-    protected override onKeyDown(e: KeyboardEvent): void {
-        if (e.code === 'ArrowUp' || e.code === 'ArrowDown') {
-            this.sceneGroupList.elem.onkeydown!(e);
-        } else {
-            const textarea = this.searchEntry.textfield.textarea;
-            textarea.focus();
-            textarea.onkeydown!(e);
-        }
-
-        if (e.defaultPrevented)
-            return;
-        super.onKeyDown(e);
+    public expandAndFocus(): void { this.setAutoClosed(false); this.setExpanded(true, false); this.browser.focus(); }
+    public setForceVisible(v: boolean): void { this.forceVisible = v; this.browser.setCatalog(this.groups, v); }
+    public setSceneDatabase(database: SceneDatabase): void {
+        const sync = () => { this.groups = database.sceneGroups; this.browser.setCatalog(this.groups, this.forceVisible); };
+        database.onchanged = sync; sync();
     }
-
-    public expandAndFocus(): void {
-        this.setExpanded(true);
-        this.setAutoClosed(false);
-        this.elem.focus();
-    }
-
-    private _setSearchString(str: string): void {
-        this.currentSearchTokens = searchRegExps(str);
-        this.syncVisibility();
-    }
-
-    private syncRandomButtonVisible(): void {
-    }
-
-    public setForceVisible(v: boolean) {
-        this.forceVisible = v;
-        this.syncVisibility();
-    }
-
-    private syncVisibility(scope: 'all' | 'levels' = 'all'): void {
-        // Start searching!
-        const n = this.currentSearchTokens;
-
-        let lastDescHeaderVisible = false;
-        function matchSceneDesc(item: (string | SceneDesc)): boolean {
-            if (typeof item === 'string') {
-                // If this is a header, then all items under the header should match.
-                lastDescHeaderVisible = matchRegExps(n, item);
-                return false;
-            } else {
-                // If header matches, then so do we.
-                if (lastDescHeaderVisible)
-                    return true;
-                return matchRegExps(n, item.name);
-            }
-        }
-
-        let lastGroupHeaderVisible = false;
-        let selectedGroupExplicitlyVisible = false;
-        for (let i = 0; i < this.sceneGroups.length; i++) {
-            const item = this.sceneGroups[i];
-            if (typeof item === 'string') {
-                // If this is a header, then all items under the header should match.
-                lastGroupHeaderVisible = matchRegExps(n, item);
-            } else {
-                let visible = false;
-                let explicitlyInvisible = false;
-
-                const isHidden = (!!item.hidden) && !this.forceVisible;
-                explicitlyInvisible = item.sceneDescs.length <= 0 || isHidden;
-
-                if (!explicitlyInvisible) {
-                    // If header matches, then we are explicitly visible.
-                    if (!visible === lastGroupHeaderVisible)
-                        visible = true;
-
-                    // If name matches, then we are explicitly visible.
-                    if (!visible && (matchRegExps(n, item.name) || (item.altName && matchRegExps(n, item.altName))))
-                        visible = true;
-
-                    if (item === this.selectedSceneGroup)
-                        selectedGroupExplicitlyVisible = visible;
-
-                    // Now check for any children.
-                    if (!visible) {
-                        lastDescHeaderVisible = false;
-                        visible = item.sceneDescs.some((g) => matchSceneDesc(g));
-                    }
-                }
-
-                if (scope === 'all')
-                    this.sceneGroupList.setItemVisible(i, visible);
-            }
-        }
-
-        lastDescHeaderVisible = false;
-        for (let i = 0; i < this.sceneDescs.length; i++) {
-            let visible;
-            if (!visible && selectedGroupExplicitlyVisible)
-                visible = true;
-            if (!visible)
-                visible = matchSceneDesc(this.sceneDescs[i]);
-            this.sceneDescList.setItemVisible(i, visible);
-        }
-
-        if (scope === 'all')
-            this.sceneGroupList.computeHeaderVisibility();
-        this.sceneDescList.computeHeaderVisibility();
-    }
-
-    public setCurrentDesc(sceneGroup: SceneGroup, sceneDesc: SceneDesc) {
-        const sceneGroupChanged = this.selectedSceneGroup !== sceneGroup;
-        this.selectedSceneGroup = sceneGroup;
-        this.currentSceneGroup = sceneGroup;
-        this.currentSceneDesc = sceneDesc;
-        if (sceneGroupChanged) {
-            this.syncSceneDescs();
-            this.syncVisibility();
-        }
-
-        this.sceneGroupList.setHighlighted(this.sceneGroups.indexOf(this.currentSceneGroup));
-        this.sceneDescList.setHighlighted(this.sceneDescs.indexOf(this.currentSceneDesc));
-    }
-
-    private setSceneGroups(sceneGroups: (string | SceneGroup)[]) {
-        this.sceneGroups = sceneGroups;
-        this.sceneGroupList.setItems(sceneGroups.map((g): ScrollSelectItem => {
-            if (typeof g === 'string')
-                return { type: ScrollSelectItemType.Header, name: g };
-            else
-                return { type: ScrollSelectItemType.Selectable, name: g.name };
-        }));
-        this.syncSceneDescs();
-        this.syncVisibility();
-    }
-
-    public setSceneDatabase(sceneDatabase: SceneDatabase): void {
-        this.setSceneGroups(sceneDatabase.sceneGroups);
-        sceneDatabase.onchanged = () => {
-            this.setSceneGroups(sceneDatabase.sceneGroups);
-        };
-    }
-
-    public setProgress(pct: number): void {
-        this.loadProgress = pct;
-        this.syncFlairs();
-        this.syncHeaderStyle();
-    }
-
-    private selectSceneDesc(sceneDesc: SceneDesc) {
-        this.onscenedescselected(sceneDesc);
-    }
-
-    private selectSceneDescIndex(i: number) {
-        this.selectSceneDesc(this.sceneDescs[i] as SceneDesc);
-    }
-
-    private selectRandom(): void {
-        const sceneGroups = this.sceneGroups.filter((v) => typeof v !== 'string' && !v.hidden && v.sceneDescs.length > 0) as SceneGroup[];
-        this.selectSceneGroup(randomChoice(sceneGroups));
-
-        const sceneDescs = this.sceneDescs.filter((v) => typeof v !== 'string') as SceneDesc[];
-        this.selectSceneDesc(randomChoice(sceneDescs));
-
-        this.sceneGroupList.scrollFocus();
-        this.sceneDescList.scrollFocus();
-    }
-
-    private getLoadingGradient(rightColor: string) {
-        const pct = `${Math.round(this.loadProgress * 100)}%`;
-        return `linear-gradient(to right, ${HIGHLIGHT_COLOR} ${pct}, ${rightColor} ${pct})`;
-    }
-
-    protected override syncHeaderStyle() {
-        super.syncHeaderStyle();
-
-        setElementHighlighted(this.header, !!this.expanded);
-        this.header.style.backgroundColor = 'transparent';
-
-        if (this.expanded)
-            this.headerContainer.style.background = HIGHLIGHT_COLOR;
-        else
-            this.headerContainer.style.background = this.getLoadingGradient(PANEL_BG_COLOR);
-    }
-
-    private syncFlairs() {
-        const sceneGroupFlairs: Flair[] = [];
-        const currentGroupIndex = this.sceneGroups.indexOf(this.currentSceneGroup);
-        if (currentGroupIndex >= 0) {
-            const flair = ensureFlairIndex(sceneGroupFlairs, currentGroupIndex);
-            flair.background = '#666';
-        }
-        this.sceneGroupList.setFlairs(sceneGroupFlairs);
-
-        const sceneDescFlairs: Flair[] = [];
-        const selectedDescIndex = this.sceneDescs.indexOf(this.currentSceneDesc);
-        if (selectedDescIndex >= 0) {
-            const flair = ensureFlairIndex(sceneDescFlairs, selectedDescIndex);
-            flair.background = this.getLoadingGradient('transparent');
-            flair.fontWeight = 'bold';
-            const pct = `${Math.round(this.loadProgress * 100)}%`;
-            flair.extraHTML = this.loadProgress < 1.0 ? `<span style="font-weight: bold; color: #aaa">${pct}</span>` : ``;
-        }
-        this.sceneDescList.setFlairs(sceneDescFlairs);
-    }
-
-    private selectSceneGroup(sceneGroup: SceneGroup): void {
-        this.selectedSceneGroup = sceneGroup;
-        this.syncSceneDescs();
-    }
-
-    private selectSceneGroupIndex(i: number) {
-        this.selectSceneGroup(this.sceneGroups[i] as SceneGroup);
-    }
-
-    private syncSceneDescs() {
-        if (this.selectedSceneGroup)
-            this.setSceneDescs(this.selectedSceneGroup.sceneDescs);
-        else
-            this.setSceneDescs([]);
-    }
-
-    private setSceneDescs(sceneDescs: (string | SceneDesc)[]) {
-        this.sceneDescs = sceneDescs.filter((g => typeof g === 'string' || !g.hidden));
-        this.sceneDescList.setItems(this.sceneDescs.map((g): ScrollSelectItem => {
-            if (typeof g === 'string')
-                return { type: ScrollSelectItemType.Header, name: g };
-            else
-                return { type: ScrollSelectItemType.Selectable, name: g.name };
-        }));
-        this.syncFlairs();
-        this.syncVisibility('levels');
-    }
+    public setCurrentDesc(group: SceneGroup, desc: SceneDesc): void { this.browser.setCurrent(group, desc); }
+    public setProgress(pct: number): void { this.loadProgress = pct; this.browser.setProgress(pct); }
 }
 
 function makeHashSafe(s: string): string {
@@ -2808,22 +2527,30 @@ export class UI {
 
     private menusHidden = false;
     private menuToggle = document.createElement('button');
+    private drawerScrim = document.createElement('button');
     private mobileControls: MobileControls;
+    private screenshotPanel: ScreenshotPanel;
     public studioModeEnabled: boolean = false;
 
     constructor(public viewer: Viewer.Viewer) {
         this.toplevel = document.createElement('div');
         this.menuToggle.type = 'button';
         this.menuToggle.className = 'menu-toggle';
+        this.menuToggle.title = 'Open library';
         this.menuToggle.setAttribute('aria-controls', 'Panel');
         this.menuToggle.onclick = () => {
             const showMenus = this.menusHidden || !this.isVisible;
             this.toggleUI(true);
-            this.setMenusHidden(!showMenus);
+            if (showMenus) this.openLibrary(); else this.setMenusHidden(true);
         };
         this.toplevel.append(this.menuToggle);
+        this.drawerScrim.type = 'button'; this.drawerScrim.className = 'drawer-scrim'; this.drawerScrim.hidden = true;
+        this.drawerScrim.setAttribute('aria-label', 'Close game browser'); this.drawerScrim.onclick = () => this.setMenusHidden(true);
+        this.toplevel.append(this.drawerScrim);
         this.mobileControls = new MobileControls(viewer.inputManager);
         this.toplevel.append(this.mobileControls.elem);
+        this.screenshotPanel = new ScreenshotPanel(viewer);
+        this.toplevel.append(this.screenshotPanel.button);
 
         this.sceneUIContainer = document.createElement('div');
         this.sceneUIContainer.style.pointerEvents = 'none';
@@ -2836,6 +2563,7 @@ export class UI {
         this.panelToplevel.style.top = '0';
         this.panelToplevel.style.bottom = '0';
         this.panelToplevel.style.padding = '2em';
+        this.panelToplevel.dataset.tab = 'library';
         this.panelToplevel.style.transition = '.2s background-color';
         this.panelToplevel.onmouseenter = () => {
             this.panelToplevel.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
@@ -2848,10 +2576,21 @@ export class UI {
         };
 
         this.panelContainer = document.createElement('div');
+        this.panelContainer.className = 'drawer-panel-stack';
         this.panelContainer.style.display = 'grid';
         this.panelContainer.style.gridTemplateColumns = '1fr';
         this.panelContainer.style.gap = '20px';
-        this.panelToplevel.appendChild(this.panelContainer);
+        const drawerHeader = document.createElement('div'); drawerHeader.className = 'drawer-header';
+        drawerHeader.innerHTML = '<div class="drawer-brand"><span class="archive-logo">N</span><div><span class="archive-kicker">WORLD ARCHIVE</span><strong>noclip<span>_</span></strong></div></div>';
+        const close = document.createElement('button'); close.type = 'button'; close.className = 'drawer-close'; close.textContent = '×'; close.setAttribute('aria-label', 'Close browser'); close.onclick = () => this.setMenusHidden(true);
+        drawerHeader.append(close);
+        const tabs = document.createElement('nav'); tabs.className = 'drawer-tabs'; tabs.setAttribute('aria-label', 'Explorer sections');
+        for (const [id, name] of [['library', 'Browse worlds'], ['view', 'View & tools']]) {
+            const button = document.createElement('button'); button.type = 'button'; button.textContent = name; button.dataset.tab = id;
+            button.onclick = () => { this.panelToplevel.dataset.tab = id; for (const b of Array.from(tabs.children)) b.setAttribute('aria-pressed', String((b as HTMLElement).dataset.tab === id)); };
+            button.setAttribute('aria-pressed', String(id === 'library')); tabs.append(button);
+        }
+        this.panelToplevel.append(drawerHeader, tabs, this.panelContainer);
 
         this.toplevel.appendChild(this.panelToplevel);
 
@@ -2906,6 +2645,7 @@ export class UI {
 
         this.viewer = viewer;
         this.mobileControls.setInput(viewer.inputManager);
+        this.screenshotPanel.setViewer(viewer);
         this.viewerSettings.setViewer(this.viewer);
         this.studioPanel.setViewer(this.viewer);
 
@@ -3013,9 +2753,14 @@ export class UI {
 
         this.isDragging = isDragging;
         this.elem.style.pointerEvents = (isDragging && !isPointerLocked) ? 'none' : '';
-        if (isDragging && this.shouldPanelsAutoClose())
-            this.setPanelsAutoClosed(true);
+        if (isDragging && this.hasScene) this.setMenusHidden(true);
         this.syncVisibilityState();
+    }
+
+    public openLibrary(): void {
+        this.toggleUI(true); this.panelToplevel.dataset.tab = 'library';
+        for (const b of Array.from(this.panelToplevel.querySelectorAll('.drawer-tabs button'))) b.setAttribute('aria-pressed', String((b as HTMLElement).dataset.tab === 'library'));
+        this.setMenusHidden(false);
     }
 
     public setMenusHidden(hidden: boolean): void {
@@ -3030,16 +2775,22 @@ export class UI {
 
     private syncVisibilityState(): void {
         const panelsVisible = !this.isEmbedMode && this.isVisible && !this.menusHidden;
-        this.panelToplevel.style.display = panelsVisible ? '' : 'none';
-        this.menuToggle.textContent = panelsVisible ? 'Hide menus' : 'Games';
+        this.panelToplevel.dataset.open = String(panelsVisible);
+        this.panelToplevel.inert = !panelsVisible;
+        this.panelToplevel.setAttribute('aria-hidden', String(!panelsVisible));
+        this.drawerScrim.hidden = !panelsVisible;
+        this.menuToggle.textContent = '›';
+        this.menuToggle.setAttribute('aria-label', panelsVisible ? 'Close browser' : 'Open game browser');
+        this.menuToggle.classList.toggle('drawer-open', panelsVisible);
         this.menuToggle.setAttribute('aria-expanded', String(panelsVisible));
         this.menuToggle.hidden = this.isEmbedMode;
+        this.screenshotPanel.button.hidden = !this.hasScene || !this.isVisible || panelsVisible || this.studioModeEnabled;
         this.mobileControls.setOrbitMode(this.viewer.cameraController instanceof OrbitCameraController || this.viewer.cameraController instanceof OrthoCameraController);
         const compact = window.matchMedia('(max-width: 1050px), (any-pointer: coarse)').matches;
         this.mobileControls.setVisible(this.hasScene && this.isVisible && (!compact || !panelsVisible));
 
         const bottomBarVisible = this.isVisible;
-        this.bottomBar.setVisible(bottomBarVisible);
+        this.bottomBar.setVisible(bottomBarVisible && !panelsVisible);
         this.bottomBar.setActive(this.shouldBottomBarBeFadeIn());
 
         this.playPauseButton.setVisible(this.hasScene);

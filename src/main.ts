@@ -660,7 +660,7 @@ class Main {
         if (inputManager.isKeyDownEventTriggered('KeyZ'))
             this._toggleUI();
         if (inputManager.isKeyDownEventTriggered('KeyT'))
-            this.ui.sceneSelect.expandAndFocus();
+            this.ui.openLibrary();
         for (let i = 1; i <= 9; i++) {
             if (inputManager.isKeyDownEventTriggered('Digit' + i)) {
                 if (this.currentSceneDesc) {
@@ -1075,8 +1075,7 @@ class Main {
         this.ui.setEmbedMode(this.isEmbedMode);
         this.toplevel.appendChild(this.ui.elem);
         this.ui.sceneSelect.onscenedescselected = (sceneDesc) => {
-            if (window.matchMedia('(max-width: 1050px), (any-pointer: coarse)').matches)
-                this.ui.setMenusHidden(true);
+            this.ui.setMenusHidden(true);
             this._onSceneDescSelected(sceneDesc);
         };
         this.ui.xrSettings.onWebXRStateRequested = this._onWebXRStateRequested.bind(this);

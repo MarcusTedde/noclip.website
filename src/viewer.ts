@@ -1,3 +1,4 @@
+import { captureMap } from './ScreenshotCapture.js';
 
 import * as UI from './ui.js';
 
@@ -146,6 +147,11 @@ export class Viewer {
 
     public addKeyMoveSpeedListener(listener: Listener): void {
         this.keyMoveSpeedListeners.push(listener);
+    }
+
+    public captureScreenshot(longEdge: number): Promise<Blob> {
+        if (!this.scene) return Promise.reject(new Error('Load a map before taking a screenshot.'));
+        return captureMap(this.canvas, () => this.render(), longEdge);
     }
 
     private renderViewport(): void {
